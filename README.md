@@ -1,103 +1,188 @@
-# 🤖 AI Interview System
+# 🤖 AI Interview System with Proctoring
 
-An intelligent interview platform that conducts automated job interviews using AI. The system analyzes candidate resumes, asks relevant questions, and provides detailed feedback and scoring.
-
-## ✨ Features
-
-- **Resume Analysis**: Upload your PDF resume and get key highlights extracted automatically
-- **Personalized Questions**: AI generates interview questions based on your resume and the job description
-- **Voice Interaction**: Speak your answers naturally - the system will transcribe and analyze them
-- **Real-time Chat**: Chat interface showing the conversation flow
-- **Intelligent Scoring**: Get detailed feedback and scores for each answer
-- **Complete Evaluation**: Receive an overall interview score and comprehensive report
-
-## 🚀 How It Works
-
-### 1. Setup
-- Upload your resume (PDF format)
-- Paste the job description you're applying for
-- Select Maximum number of Questions (Optional)
-- Select AI Interviewer Voice (Optional)
-- Click "Submit" to process your information
-
-### 2. Interview Process
-- Click "Start Interview" to begin
-- The AI will greet you and ask the first question
-- Listen to each question (text-to-speech enabled)
-- Record your answer using the audio recorder **(Make sure to use Chrome Browser Only)**
-- The system transcribes and analyzes your response
-- Receive the next question based on your previous answers
-
-### 3. Get Results
-- Complete selected number interview questions
-- Receive detailed feedback for each answer
-- Get an overall interview score out of 10
-- Review the complete chat history and evaluation report
-
-## 🎯 What Makes It Special
-
-- **Adaptive Questioning**: Each question builds on your previous answers
-- **Natural Conversation**: Feels like talking to a real interviewer
-- **Detailed Feedback**: Understand what you did well and areas for improvement
-- **Professional Interface**: Clean, easy-to-use chat-based design
-- **Complete Documentation**: Full interview transcript and scoring breakdown
-
-## 📋 Requirements
-- Internet connection for AI processing
-- Microphone access for recording answers
-- PDF resume file
-- Job description text
-- LLM API key for AI processing
-    - Supported Models (LiteLLM): https://docs.litellm.ai/docs/providers (Change LLM_MODEL in .env)
-    - Free Experimental Model from MistralAI: https://mistral.ai/
-    - Note: If you're using a different model provider such as OpenAI, be sure to update the environment variable from MISTRAL_API_KEY to OPENAI_API_KEY as per the LiteLLM guidelines.
-- Speechmatics API key for speech-to-text
-    - Speechmatics Platform: https://www.speechmatics.com/
-
-## 🎨 Interface
-
-The system features a modern chat interface similar to ChatGPT:
-- **AI Interviewer** messages appear on the left (questions and instructions)
-- **Your responses** appear on the right (transcribed from audio)
-- **Progress tracker** shows which question you're on
-- **Audio recorder** for easy voice input
-
-## 📊 Scoring System
-
-Each answer receives:
-- Individual score (0-10)
-- Detailed written feedback
-- Suggestions for improvement
-
-Final results include:
-- Overall interview score
-- Question-by-question breakdown
-- Complete conversation history
-- Personalized recommendations
-
-## 🚀 How to run in local environment.
-1.  Clone the repository
-2. Create a virtual environment
-3. Install dependencies inside the virtual environment.
-4. Add environment variables (.env.example) like API keys
-5. Run the application.
-
-
-## 🔄 Multiple Interviews
-
-- Take multiple practice interviews
-- Try different job descriptions
-- Track your improvement over time
-- Perfect your interview skills
-
-## 💡 Tips for Best Results
-
-- Speak clearly when recording answers
-- Provide detailed, specific responses
-- Take your time - there's no rush
-- Treat it like a real interview
-- Review feedback to improve
+An intelligent, end-to-end interview platform that simulates real-world technical and HR interviews using AI, with integrated **proctoring**, **resume-based questioning**, and **real-time evaluation**.
 
 ---
 
-*Ready to ace your next interview? Upload your resume and get started!*
+## 🚀 Live Features
+
+### 🎤 AI Interview Engine
+
+* HR + Technical interview modes
+* Dynamic question generation using LLMs
+* Adaptive difficulty based on candidate performance
+
+### 📄 Resume-Based Questioning
+
+* Upload resume
+* Extract skills automatically
+* Generate **personalized technical questions**
+
+### 🧠 Intelligent Evaluation
+
+* Answer analysis with feedback
+* Score out of 10 for each response
+* Continuous performance tracking
+
+### 🛡️ AI Proctoring System
+
+* 🎥 Face monitoring (MediaPipe)
+* 👀 Detect looking away / phone usage
+* 👥 Detect multiple faces
+* ❌ Detect tab switching
+* 🖥️ Screen sharing monitoring
+* 📊 Real-time cheating score
+
+### 💬 Modern UI (React)
+
+* ChatGPT-style conversation interface
+* Dark mode UI 🌙
+* Smooth animations ✨
+* Live timer ⏱️
+* Progress tracking 📊
+
+---
+
+## 🏗️ Tech Stack
+
+### Frontend
+
+* React.js
+* Framer Motion (animations)
+* MediaPipe (face detection)
+* WebSockets
+
+### Backend
+
+* FastAPI
+* Python
+* LiteLLM (LLM integration)
+
+### AI / ML
+
+* Resume parsing using LLM
+* NLP-based feedback generation
+* Face tracking & behavior analysis
+
+---
+
+## 📂 Project Structure
+
+```
+AI-Interview-System/
+│
+├── frontend/        # React UI
+├── backend/         # FastAPI server
+├── utils/           # AI + processing modules
+├── outputs/         # Saved interview data
+└── README.md
+```
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1️⃣ Clone the repository
+
+```
+git clone https://github.com/YOUR_USERNAME/AI-Interview-System.git
+cd AI-Interview-System
+```
+
+---
+
+### 2️⃣ Backend Setup
+
+```
+cd backend
+python -m venv venv
+venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+```
+
+---
+
+### 3️⃣ Add Environment Variables
+
+Create `.env` file:
+
+```
+LLM_MODEL=your_model
+GROQ_API_KEY=your_key
+SPEECHMATICS_API_KEY=your_key
+```
+
+---
+
+### 4️⃣ Run Backend
+
+```
+python -m uvicorn main:app --reload
+```
+
+---
+
+### 5️⃣ Frontend Setup
+
+```
+cd frontend
+npm install
+npm start
+```
+
+---
+
+## 🎯 How It Works
+
+1. Upload resume
+2. Select interview mode (HR / Technical)
+3. Start interview
+4. Answer questions in chat UI
+5. AI evaluates responses
+6. Proctoring monitors behavior
+7. Get feedback + score
+
+---
+
+## 📊 Proctoring Score System
+
+| Behavior             | Score Impact |
+| -------------------- | ------------ |
+| Tab switching        | +2           |
+| Looking away         | +1           |
+| Multiple faces       | +3           |
+| No face detected     | +2           |
+| Screen share stopped | +5           |
+
+---
+
+## 💡 Key Highlights
+
+* Real-time AI interview simulation
+* Resume-aware question generation
+* Adaptive difficulty system
+* Advanced proctoring features
+* Clean and modern UI
+* Full-stack AI integration
+
+---
+
+## 🚀 Future Improvements
+
+* Coding interview with live compiler
+* PDF resume parsing
+* Proctoring report generation
+* Interview history dashboard
+* Deployment (AWS / Vercel)
+
+---
+
+## 👨‍💻 Author
+
+**Karthik Jyothi**
+
+---
+
+## ⭐ If you like this project
+
+Give it a star ⭐ on GitHub — it helps a lot!
