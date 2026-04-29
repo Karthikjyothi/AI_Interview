@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Interview from "./pages/Interview";
 import ResumeAnalyzer from "./pages/ResumeAnalyzer";
 import Admin from "./pages/Admin";
-
+import TCSMockTest from "./pages/TCSMockTest";
 // 🔥 Sidebar Item Component
 const NavItem = ({ to, label }) => (
   <Link
@@ -51,6 +51,7 @@ function App() {
 
           <NavItem to="/" label="🎤 Interview" />
           <NavItem to="/resume" label="📄 Resume Analyzer" />
+          <NavItem to="/mock-test" label="📝 Mock Test" />
           <NavItem to="/admin" label="📊 Admin Panel" />
         </div>
 
@@ -59,6 +60,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Interview />} />
             <Route path="/resume" element={<ResumeAnalyzer />} />
+            <Route path="/mock-test" element={<TCSMockTest />} />
             <Route path="/admin" element={<Admin />} />
           </Routes>
         </div>

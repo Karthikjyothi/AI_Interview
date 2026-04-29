@@ -55,26 +55,36 @@ function Interview() {
   // 🔌 WebSocket
   useEffect(() => {
     let socket;
-    
+    let isMounted = true; // ✅ Track if the component is still active
+
     const connect = () => {
+      if (!isMounted) return; // 🛑 Stop if we've moved to another page
+
       socket = new WebSocket("ws://localhost:8000/ws/user1");
-      socket.onopen = () => console.log("Connected!");
       
-      socket.onclose = () => {
-        console.log("Disconnected! Retrying in 3 seconds...");
-        setTimeout(connect, 3000); // 🔄 Auto-reconnect logic                                  
-      };
+      socket.onopen = () => console.log("Connected!");
 
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         setScore(data.cheating_score);
       };
 
+      socket.onclose = () => {
+        if (isMounted) { // ✅ Only retry if the user hasn't left the page
+          console.log("Disconnected! Retrying in 3 seconds...");
+          setTimeout(connect, 3000);
+        }
+      };
+
       ws.current = socket;
     };
 
     connect();
-    return () => socket.close();
+
+    return () => {
+      isMounted = false; // 🛑 Mark as unmounted
+      if (socket) socket.close(); 
+    };
   }, []);
 
   // 🚨 Safer Tab switch logic
