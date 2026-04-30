@@ -189,251 +189,43 @@ LIMITS = {
 # ================= MOCK TEST API =================
 @app.get("/get-mock-test")
 async def get_mock_test():
-    print("🔥 NEW MOCK TEST API CALLED")
-    global CURRENT_MOCK_CACHE
+    print("Generating hybrid premium mock test...")
 
-    if CURRENT_MOCK_CACHE:
-        print("USING CACHED MOCK TEST")
-        return CURRENT_MOCK_CACHE
+    numerical = generate_numerical()
+    verbal = generate_verbal()
+    reasoning = generate_reasoning()
+    advanced = generate_advanced()
+    coding = generate_coding()
 
-    exam_structure = {}
+    # ---------- SAFE BACKUP FILLS ----------
+    if len(numerical) < 10:
+        numerical += fetch_backup_questions("Numerical", 10 - len(numerical))
 
-    # ================= CODING FROM DB FIRST =================
-    cursor.execute("""
-        SELECT * FROM mock_questions
-        WHERE section='Coding'
-        ORDER BY RANDOM()
-        LIMIT 2
-    """)
-    rows = cursor.fetchall()
+    if len(verbal) < 15:
+        verbal += fetch_backup_questions("Verbal", 15 - len(verbal))
 
-    exam_structure["Coding"] = [
-        {
-            "id": r[0],
-            "type": r[3],
-            "question": r[4],
-            "options": [],
-            "correct": r[9]
-        }
-        for r in rows
-    ]
+    if len(reasoning) < 10:
+        reasoning += fetch_backup_questions("Reasoning", 10 - len(reasoning))
 
+    if len(advanced) < 10:
+        advanced += fetch_backup_questions("Advanced quants & reasoning", 10 - len(advanced))
 
-    # ================= SINGLE MASTER AI CALL =================
-    try:
-        difficulty = "Medium"
+    if len(coding) < 2:
+        coding += fetch_backup_questions("Coding", 2 - len(coding))
 
-        prompt = f"""
-        You are an expert TCS NQT exam paper setter.
-
-        You MUST generate a COMPLETE TCS NQT mock exam in ONE valid JSON response.
-
-        ALL sections are COMPULSORY.
-        Do not skip any section.
-        Do not stop until all sections are fully generated.
-
-        MANDATORY COUNT:
-        Generate a FULL TCS NQT mock exam with:
-        - 10 HIGH-QUALITY {difficulty} level Numerical questions
-        - 15 HIGH-QUALITY {difficulty} level Verbal questions
-        - 10 HIGH-QUALITY {difficulty} level Reasoning questions
-        - 10 HIGH-QUALITY {difficulty} level Advanced quants & reasoning questions
-
-        If any section has fewer questions, the response is invalid.
-
-
-        STRICT RULES:
-        - Questions must match real TCS NQT difficulty (not basic like 2+2)
-        - Avoid trivial questions
-        - Include logical reasoning, tricky calculations, or real-world scenarios
-        - Ensure options are confusing but valid
-        - Only 1 correct answer
-
-        FORMAT (VERY IMPORTANT):
-        Return ONLY JSON object like this:
-
-        {{
-            "Numerical": [
-                {{
-                    "type": "mcq",
-                    "question": "Question text",
-                    "options": ["A", "B", "C", "D"],
-                    "correct": "0"
-                }}
-            ],
-            "Verbal": [],
-            "Reasoning": [],
-            "Advanced quants & reasoning": [],
-            "Coding": []
-        }}
-
-        SECTION RULES:
-        - Generate questions that require multiple steps of reasoning or calculation.
-        - Select topics in a random order, but ensure a good mix of all important TCS NQT topics. don't generate same questions everytime
-        Numerical:
-        - Time-speed-distance
-        - Profit & loss
-        - Percentages
-        - Ratios
-        - Averages
-        - Number System
-        - Simple & Compound Interest
-        - Time & Work
-        - Time-Speed-Distance
-        - Data Interpretation (Graphs, Charts)
-        - Probability 
-        - Mensuration
-        - Simplification
-
-        Verbal:
-        - Reading comprehension
-        - Sentence correction
-        - Vocabulary (advanced)
-        - Synonyms
-        - Antonyms
-        - Error Correction (Grammar)
-        - Sentence Rearrangement
-        - Paragraph Completion
-        - Prepositions
-        - Tenses
-
-        Reasoning:
-        - Number series
-        - Coding-decoding
-        - Logical puzzles
-        - Blood relations
-        - Seating Arrangements
-        - Direction sense
-        - Syllogism
-
-        Advanced quants & reasoning:
-        - Higher difficulty level of all the above topics
-
-        Coding:
-        - Data Structures (Arrays, Linked Lists, Stacks, Queues), Algorithms (Sorting/Searching), Strings, Number Theory, Matrix operations.
-        - Ask 1 problem only (if section is Coding) from the above points but make it tricky and not a common one like "reverse a string". Focus on problem-solving and logic also try to extract some context from the question to make it more real-world like. For example, if it's a string problem, embed it in a real-world scenario like "You are building a search engine and need to optimize string matching for user queries. Write a function that...".
-        - Also give few examples of input and output for the coding question to make it more clear. Make sure the problem is of medium difficulty level and not too easy.
-        - Give testcases for the coding question in the correct_answer field in a structured format like: input hjgh, output 2, input abc, output 3, etc. This will be used for auto-evaluation later.
-        - Medium DSA level
-
-        IMPORTANT:
-        Do NOT generate easy questions.
-        Make them slightly tricky like real placement exams.
-        """
-
-        ai_data = call_groq_llm(prompt)
-        print("MASTER AI RESPONSE:", ai_data)
-
-        if isinstance(ai_data, dict):
-            normalized = {k.lower(): v for k, v in ai_data.items()}
-
-            exam_structure["Numerical"] = normalized.get("numerical", [])
-            exam_structure["Verbal"] = normalized.get("verbal", [])
-            exam_structure["Reasoning"] = normalized.get("reasoning", [])
-            exam_structure["Advanced quants & reasoning"] = normalized.get("advanced quants & reasoning", [])
-            if normalized.get("coding"):
-                exam_structure["Coding"] = normalized.get("coding", [])
-
-        else:
-            exam_structure["Numerical"] = []
-            exam_structure["Verbal"] = []
-            exam_structure["Reasoning"] = []
-            exam_structure["Advanced quants & reasoning"] = []
-            exam_structure["Coding"] = []
-    except Exception as e:
-        print("MASTER AI FAILED:", e)
-        exam_structure["Numerical"] = []
-        exam_structure["Verbal"] = []
-        exam_structure["Reasoning"] = []
-        exam_structure["Advanced quants & reasoning"] = []
-
-    # ================= VALIDATE AI QUESTIONS =================
-    cleaned = {
-        "Numerical": [],
-        "Verbal": [],
-        "Reasoning": [],
-        "Advanced quants & reasoning": [],
-        "Coding": exam_structure["Coding"]
+    final_exam = {
+        "Numerical": numerical[:10],
+        "Verbal": verbal[:15],
+        "Reasoning": reasoning[:10],
+        "Advanced quants & reasoning": advanced[:10],
+        "Coding": coding[:2]
     }
 
-    for sec in ["Numerical", "Verbal", "Reasoning", "Advanced quants & reasoning"]:
-        data_list = exam_structure.get(sec, [])
+    print("FINAL HYBRID EXAM COUNTS:")
+    for k, v in final_exam.items():
+        print(k, len(v))
 
-        valid_ai = []
-
-        for i, q in enumerate(data_list):
-            try:
-                question = q.get("question") or q.get("ques")
-                options = q.get("options") or []
-
-                if question and isinstance(options, list) and len(options) >= 4:
-                    valid_ai.append({
-                        "id": f"ai-{sec}-{i}",
-                        "type": "mcq",
-                        "question": question,
-                        "options": options[:4]
-                    })
-            except:
-                continue
-
-        # coding preserve directly
-        coding_ai = []
-        for i, q in enumerate(exam_structure.get("Coding", [])):
-            coding_ai.append({
-                "id": q.get("id", f"code-{i}"),
-                "type": "coding",
-                "question": q.get("question", ""),
-                "options": [],
-                "correct": q.get("correct", "")
-            })
-            
-        cleaned["Coding"] = coding_ai
-        cleaned[sec] = valid_ai
-
-    # ================= FORCE EXACT COUNTS =================
-    for sec, limit in LIMITS.items():
-
-        current_count = len(cleaned.get(sec, []))
-
-        if current_count > limit:
-            cleaned[sec] = cleaned[sec][:limit]
-
-        elif current_count < limit:
-
-            needed = limit - current_count
-
-            db_sec = sec
-            if sec == "Advanced quants & reasoning":
-                db_sec = "Advanced quants & reasoning"
-
-            cursor.execute("""
-                SELECT * FROM mock_questions
-                WHERE LOWER(section)=LOWER(?)
-                ORDER BY RANDOM()
-                LIMIT ?
-            """, (db_sec, needed))
-
-            rows = cursor.fetchall()
-
-            extra_questions = [
-                {
-                    "id": r[0],
-                    "type": r[3],
-                    "question": r[4],
-                    "options": [r[5], r[6], r[7], r[8]] if r[3] == "mcq" else [],
-                    "correct": r[9] if len(r) > 9 else ""
-                }
-                for r in rows
-            ]
-
-            cleaned[sec].extend(extra_questions)
-
-    print("FINAL CLEANED:")
-    for k, v in cleaned.items():
-        print(k, "→", len(v))
-
-    CURRENT_MOCK_CACHE = cleaned
-    return cleaned
+    return final_exam
 
 # ================= START =================
 @app.post("/start")
@@ -843,6 +635,215 @@ def call_groq_llm(prompt):
         print(f"Groq AI Error: {e}")
         return {}
     
+def call_groq_mock_llm(prompt):
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert TCS NQT exam paper setter. Always return only valid JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model="llama-3.1-8b-instant",
+            response_format={"type": "json_object"},
+            temperature=0.95,
+            max_tokens=1800
+        )
+
+        raw = chat_completion.choices[0].message.content
+        print("MOCK RAW:", raw)
+
+        return json.loads(raw)
+
+    except Exception as e:
+        print("MOCK GEN ERROR:", e)
+        return {}
+    
+def generate_numerical():
+    prompt = """
+Generate 10 unique TCS NQT Numerical Ability MCQ questions.
+
+Rules:
+- All questions must be different from common average speed examples.
+- Cover percentages, profit loss, ratios, averages, SI/CI, time work, number system, DI, probability.
+- Generate questions that require multiple steps of reasoning or calculation.
+- Select topics in a random order, but ensure a good mix of all important TCS NQT topics. don't generate same questions everytime
+- Match the style and complexity of real TCS NQT questions, which often involve tricky scenarios or require deeper understanding rather than straightforward questions.
+- adapt the questions to be slightly tricky, like real placement exams, rather than too easy or direct ones.
+
+Topics to cover:
+- Time-speed-distance
+- Profit & loss
+- Percentages
+- Ratios
+- Averages
+- Number System
+- Simple & Compound Interest
+- Time & Work
+- Time-Speed-Distance
+- Data Interpretation (Graphs, Charts)
+- Probability 
+- Mensuration
+- Simplification
+- Return JSON:
+{
+ "Numerical":[
+   {
+    "type":"mcq",
+    "question":"...",
+    "options":["A","B","C","D"],
+    "correct":0
+   }
+ ]
+}
+"""
+    return call_groq_mock_llm(prompt).get("Numerical", [])
+
+def generate_verbal():
+    prompt = """
+Generate 15 unique TCS NQT Verbal Ability MCQ questions.
+
+        SECTION RULES:
+        - Generate questions that require multiple steps of reasoning or calculation.
+        - Select topics in a random order, but ensure a good mix of all important TCS NQT topics. don't generate same questions everytime
+        - Match the style and complexity of real TCS NQT questions, which often involve tricky scenarios or require deeper understanding rather than straightforward questions.
+        - adapt the questions to be slightly tricky, like real placement exams, rather than too easy or direct ones
+
+        Topics to cover:
+        - Reading comprehension
+        - Sentence correction
+        - Vocabulary (advanced)
+        - Synonyms
+        - Antonyms
+        - Error Correction (Grammar)
+        - Sentence Rearrangement
+        - Paragraph Completion
+        - Prepositions
+        - Tenses
+
+Return JSON:
+{
+ "Verbal":[
+   {
+    "type":"mcq",
+    "question":"...",
+    "options":["A","B","C","D"],
+    "correct":0
+   }
+ ]
+}
+"""
+    return call_groq_mock_llm(prompt).get("Verbal", [])
+
+def generate_reasoning():
+    prompt = """
+Generate 10 unique TCS NQT Logical Reasoning MCQ questions.
+
+        SECTION RULES:
+        - Generate questions that require multiple steps of reasoning or calculation.
+        - Select topics in a random order, but ensure a good mix of all important TCS NQT topics. don't generate same questions everytime
+        - Match the style and complexity of real TCS NQT questions, which often involve tricky scenarios or require deeper understanding rather than straightforward questions.
+        - adapt the questions to be slightly tricky, like real placement exams, rather than too easy or direct ones.
+
+Topics to cover:
+- Number series
+- Logical puzzles
+- Seating Arrangements
+- Direction sense
+- Syllogism
+- coding decoding
+- blood relation
+- direction
+- syllogism
+- seating
+- puzzle
+- series
+- analogy
+
+Return JSON:
+{
+ "Reasoning":[
+   {
+    "type":"mcq",
+    "question":"...",
+    "options":["A","B","C","D"],
+    "correct":0
+   }
+ ]
+}
+"""
+    return call_groq_mock_llm(prompt).get("Reasoning", [])
+
+def generate_advanced():
+    prompt = """
+Generate 10 difficult advanced quantitative and logical reasoning MCQ questions for TCS Digital level.
+
+Return JSON:
+{
+ "Advanced":[
+   {
+    "type":"mcq",
+    "question":"...",
+    "options":["A","B","C","D"],
+    "correct":0
+   }
+ ]
+}
+"""
+    return call_groq_mock_llm(prompt).get("Advanced", [])
+
+def generate_coding():
+    cursor.execute("""
+        SELECT id, question, correct_answer
+        FROM mock_questions
+        WHERE LOWER(section)='coding'
+        ORDER BY RANDOM()
+        LIMIT 2
+    """)
+
+    rows = cursor.fetchall()
+
+    coding = []
+
+    for r in rows:
+        coding.append({
+            "id": r[0],
+            "type": "coding",
+            "question": r[1],
+            "options": [],
+            "correct": r[2]
+        })
+
+    return coding
+
+def fetch_backup_questions(section_name, needed):
+    cursor.execute("""
+        SELECT id, q_type, question, option_a, option_b, option_c, option_d, correct_answer
+        FROM mock_questions
+        WHERE LOWER(section)=LOWER(?)
+        ORDER BY RANDOM()
+        LIMIT ?
+    """, (section_name, needed))
+
+    rows = cursor.fetchall()
+
+    backup = []
+
+    for r in rows:
+        backup.append({
+            "id": r[0],
+            "type": r[1],
+            "question": r[2],
+            "options": [r[3], r[4], r[5], r[6]] if r[1] == "mcq" else [],
+            "correct": int(r[7]) if r[1] == "mcq" else r[7]
+        })
+
+    return backup
+
 def sanitize_resume_result(result):
     if not isinstance(result, dict):
         result = {}

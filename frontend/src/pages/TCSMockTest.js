@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Editor from "@monaco-editor/react";
+import { FaceDetection } from "@mediapipe/face_detection";
+import { Camera } from "@mediapipe/camera_utils";
 
 const SECTIONS = [
   { name: "Numerical", duration: 1800 },
@@ -25,6 +27,15 @@ const TcsMockTest = () => {
   const [finalResult, setFinalResult] = useState(null);
   const [fullscreenViolations, setFullscreenViolations] = useState(0);
   const [examStarted, setExamStarted] = useState(false);
+  const [proctorActive, setProctorActive] = useState(false);
+  const violationRef = useRef(0);
+  const [tabViolations, setTabViolations] = useState(0);
+  const tabViolationRef = useRef(0);
+  const [submissionLocked, setSubmissionLocked] = useState(false);
+  const submissionRef = useRef(false);
+  const videoRef = useRef(null);
+  const [cameraWarnings, setCameraWarnings] = useState(0);
+  const cameraWarnRef = useRef(0);
 
 // ✅ FETCH DATA
 useEffect(() => {
@@ -139,7 +150,28 @@ useEffect(() => {
   }
 }, [currentQIdx, activeSecIdx]);
 
+const enterFullScreen = async () => {
+  const elem = document.documentElement;
+
+  try {
+    if (elem.requestFullscreen) {
+      await elem.requestFullscreen();
+    } else if (elem.webkitRequestFullscreen) {
+      await elem.webkitRequestFullscreen();
+    } else if (elem.msRequestFullscreen) {
+      await elem.msRequestFullscreen();
+    }
+  } catch (err) {
+    console.log("Fullscreen permission blocked");
+  }
+};
+
 const submitTest = useCallback(async () => {
+  if (submissionRef.current) return;
+
+    submissionRef.current = true;
+    setSubmissionLocked(true);
+
   const res = await fetch("http://localhost:8000/submit-mock-test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -202,6 +234,39 @@ const submitTest = useCallback(async () => {
   });
 }, [answers, codingScores]);
 
+useEffect(() => {
+  const handleFullScreenChange = async () => {
+    if (!examStarted || !proctorActive || finalResult || submissionLocked) return;
+
+    if (!document.fullscreenElement) {
+      violationRef.current += 1;
+      const count = violationRef.current;
+
+      setFullscreenViolations(count);
+
+      if (count >= 3) {
+        window.alert("3 fullscreen violations detected. Test will be auto submitted.");
+        submitTest();
+        return;
+      }
+
+      window.alert(`Warning ${count}/3: You exited fullscreen mode. Returning to exam.`);
+
+      try {
+        await enterFullScreen();
+      } catch (e) {
+        console.log("re-enter fullscreen failed");
+      }
+    }
+  };
+
+  document.addEventListener("fullscreenchange", handleFullScreenChange);
+
+  return () => {
+    document.removeEventListener("fullscreenchange", handleFullScreenChange);
+  };
+}, [examStarted, proctorActive, finalResult, submitTest]);
+
 const moveToNextSection = useCallback(() => {
   if (currentSectionName === "Coding" && !submitResult) {
     alert("Please submit your code before leaving Coding section.");
@@ -218,8 +283,158 @@ const moveToNextSection = useCallback(() => {
   }
 }, [activeSecIdx, currentSectionName, submitResult, submitTest]);
 
+useEffect(() => {
+  const handleVisibility = () => {
+    if (!examStarted || !proctorActive || finalResult || submissionLocked) return;
+
+    if (document.hidden) {
+      tabViolationRef.current += 1;
+      const count = tabViolationRef.current;
+
+      setTabViolations(count);
+
+      if (count >= 3) {
+        window.alert("3 tab switch violations detected. Test will be auto submitted.");
+        submitTest();
+        return;
+      }
+
+      window.alert(`Tab Switch Warning ${count}/3: Do not leave the exam window.`);
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibility);
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibility);
+  };
+}, [examStarted, proctorActive, finalResult, submitTest]);
+
+useEffect(() => {
+  const handleBeforeUnload = (e) => {
+    if (examStarted && !finalResult) {
+      submitTest();
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
+
+  window.addEventListener("beforeunload", handleBeforeUnload);
+
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+  };
+}, [examStarted, finalResult, submitTest]);
+
+useEffect(() => {
+  const disableRightClick = (e) => {
+    if (examStarted && !finalResult) {
+      e.preventDefault();
+    }
+  };
+
+  document.addEventListener("contextmenu", disableRightClick);
+
+  return () => {
+    document.removeEventListener("contextmenu", disableRightClick);
+  };
+}, [examStarted, finalResult]);
+
+useEffect(() => {
+  
+  const blockKeys = (e) => {
+    if (!examStarted || finalResult) return;
+
+    if (
+      e.key === "F12" ||
+      (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "i") ||
+      (e.ctrlKey && e.key.toLowerCase() === "u") ||
+      (e.ctrlKey && e.key.toLowerCase() === "r") ||
+      (e.ctrlKey && e.key.toLowerCase() === "s") ||
+      (e.ctrlKey && e.key.toLowerCase() === "a") ||
+      (e.ctrlKey && e.key.toLowerCase() === "c") ||
+      (e.ctrlKey && e.key.toLowerCase() === "v") ||
+      (e.ctrlKey && e.key.toLowerCase() === "x") ||
+      (e.ctrlKey && e.key.toLowerCase() === "w") ||
+      (e.ctrlKey && e.key.toLowerCase() === "n") ||
+      (e.ctrlKey && e.key.toLowerCase() === "t")
+    ) {
+      e.preventDefault();
+    }
+  };
+
+  window.addEventListener("keydown", blockKeys);
+
+  return () => {
+    window.removeEventListener("keydown", blockKeys);
+  };
+}, [examStarted, finalResult]);
+
+useEffect(() => {
+  const preventEsc = (e) => {
+    if (e.key === "Escape" && examStarted && !finalResult) {
+      e.preventDefault();
+    }
+  };
+
+  window.addEventListener("keydown", preventEsc);
+
+  return () => window.removeEventListener("keydown", preventEsc);
+}, [examStarted, finalResult]);
+
+useEffect(() => {
+  if (!examStarted || !proctorActive || finalResult) return;
+
+  let camera = null;
+
+  const faceDetection = new FaceDetection({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`,
+  });
+
+  faceDetection.setOptions({
+    model: "short",
+    minDetectionConfidence: 0.5,
+  });
+
+  faceDetection.onResults((results) => {
+    const faces = results.detections ? results.detections.length : 0;
+
+    if (faces !== 1) {
+      cameraWarnRef.current += 1;
+      const count = cameraWarnRef.current;
+      setCameraWarnings(count);
+
+      if (count >= 10) {
+        window.alert("Repeated camera monitoring violations. Test auto submitting.");
+        submitTest();
+      } else {
+        console.log(`Camera Warning ${count}: face count = ${faces}`);
+      }
+    }
+  });
+
+  if (videoRef.current) {
+    camera = new Camera(videoRef.current, {
+      onFrame: async () => {
+        await faceDetection.send({ image: videoRef.current });
+      },
+      width: 320,
+      height: 240,
+    });
+    camera.start();
+  }
+
+  return () => {
+    if (camera) camera.stop();
+    faceDetection.close();
+  };
+}, [examStarted, proctorActive, finalResult, submitTest]);
+
 // ⏱ TIMER
 useEffect(() => {
+  if (!examStarted || finalResult || submissionLocked) return;
+
   const timer = setInterval(() => {
     setTimeLeft(prev => {
       if (prev <= 1) {
@@ -231,7 +446,60 @@ useEffect(() => {
   }, 1000);
 
   return () => clearInterval(timer);
-}, [moveToNextSection]);
+}, [moveToNextSection, examStarted, finalResult]);
+
+if (!examStarted && !loading) {
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#020617",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      color: "white"
+    }}>
+      <div style={{
+        width: "650px",
+        background: "#0f172a",
+        padding: "35px",
+        borderRadius: "20px",
+        textAlign: "center"
+      }}>
+        <h1 style={{ color: "#38bdf8" }}>📝 TCS Full Mock Assessment</h1>
+
+        <p style={{ marginTop: "20px", lineHeight: "1.8" }}>
+          • Test will run in fullscreen mode.<br/>
+          • Exiting fullscreen more than 3 times will auto submit the exam.<br/>
+          • Timer starts only after exam begins.<br/>
+          • Final performance dashboard will be shown after completion.
+        </p>
+
+        <button
+          onClick={async () => {
+            await enterFullScreen();
+            setExamStarted(true);
+
+            setTimeout(() => {
+              setProctorActive(true);
+            }, 1200);
+          }}
+          style={{
+            marginTop: "25px",
+            background: "#2563eb",
+            color: "white",
+            border: "none",
+            padding: "14px 28px",
+            borderRadius: "10px",
+            fontWeight: "bold",
+            cursor: "pointer"
+          }}
+        >
+          Start Fullscreen Test
+        </button>
+      </div>
+    </div>
+  );
+}
 
 if (loading) {
   return (
@@ -262,6 +530,7 @@ const handleFinalSubmit = async () => {
 
   await submitTest();
 };
+
 if (finalResult) {
   return (
     <div style={{
@@ -313,17 +582,6 @@ if (finalResult) {
     </div>
   );
 }
-const enterFullScreen = () => {
-  const elem = document.documentElement;
-
-  if (elem.requestFullscreen) {
-    elem.requestFullscreen();
-  } else if (elem.webkitRequestFullscreen) {
-    elem.webkitRequestFullscreen();
-  } else if (elem.msRequestFullscreen) {
-    elem.msRequestFullscreen();
-  }
-};
 
   return (
   <div style={{ display: "flex", height: "100vh", background: "#020617" }}>
@@ -347,6 +605,7 @@ const enterFullScreen = () => {
           onClick={() => {
             setActiveSecIdx(i);
             setCurrentQIdx(0);
+            setTimeLeft(SECTIONS[i].duration);
           }}
           style={{
             marginRight: "30px",
@@ -358,8 +617,7 @@ const enterFullScreen = () => {
         </div>
       ))}
 
-      <button
-        onClick={handleFinalSubmit}
+      <button onClick={handleFinalSubmit} disabled={submissionLocked}
         style={{
           background: "#dc2626",
           color: "white",
@@ -367,7 +625,8 @@ const enterFullScreen = () => {
           padding: "10px 20px",
           borderRadius: "8px",
           fontWeight: "bold",
-          cursor: "pointer"
+          opacity: submissionLocked ? 0.5 : 1,
+          cursor: submissionLocked ? "not-allowed" : "pointer"
         }}
       >
         Final Submit Test
@@ -378,6 +637,15 @@ const enterFullScreen = () => {
         color: timeLeft < 60 ? "red" : "#38bdf8"
       }}>
         ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+      </div>
+      <div style={{ marginLeft: "20px", color: "#f87171", fontWeight: "bold" }}>
+        Violations: {fullscreenViolations}/3
+      </div>
+      <div style={{ marginLeft: "20px", color: "#f87171", fontWeight: "bold" }}>
+        Violations: TAB {tabViolations}/3
+      </div>
+      <div style={{ marginLeft: "20px", color: "#f87171", fontWeight: "bold" }}>
+        Violations: CAM:{cameraWarnings}/10
       </div>
     </div>
 
@@ -655,6 +923,23 @@ const enterFullScreen = () => {
         </div>
       )}
     </div>
+
+    <video
+      ref={videoRef}
+      autoPlay
+      muted
+      playsInline
+      style={{
+        position: "fixed",
+        bottom: "20px",
+        right: "20px",
+        width: "180px",
+        height: "130px",
+        borderRadius: "12px",
+        border: "2px solid #334155",
+        zIndex: 9999
+      }}
+    />
 
     {/* RIGHT PANEL */}
     <div style={{
